@@ -28,7 +28,7 @@ console.error = (message) => logToFileAndConsole(message, "stderr");
 let sessionActive = true;
 let whatsappWindowActive = false;
 let disconnectCounter = 60;
-const clientCompanyId = 2; // Akil Security
+const clientCompanyId = 13; // Akil Security
 
 function connectWebSocket() {
   const ws = new WebSocket("wss://139.59.69.241:7779", {
@@ -53,7 +53,7 @@ function connectWebSocket() {
       console.log("WhatsApp session inactive. Skipping message processing.");
       return;
     }
-    whatsappWindowActive = false;
+whatsappWindowActive=false;
     try {
       const {
         whatsapp_number,
@@ -155,30 +155,30 @@ async function processWhatsAppMessageBulk(ws, message) {
 
   whatsappWindowActive = false;
 }
-// async function processWhatsAppMessage(ws, phone, message, id) {
-//   whatsappWindowActive = true;
-//   try {
-//     await wbm.start({
-//       showBrowser: true,
-//       session: sessionActive,
-//       sessionName: "akil_session",
-//     });
+async function processWhatsAppMessage(ws, phone, message, id) {
+  whatsappWindowActive = true;
+  try {
+    await wbm.start({
+      showBrowser: true,
+      session: sessionActive,
+      sessionName: "akil_session",
+    });
 
-//     await wbm.send([phone], message);
-//     const wpResponse = await wbm.end();
-//     sendResponse(
-//       ws,
-//       id,
-//       "sent",
-//       wpResponse === "browser-closed" ? "browser-closed" : "completed"
-//     );
-//     console.log(`Message processed successfully at: ${getFormattedDate()}`);
-//   } catch (err) {
-//     console.error("Error during WhatsApp message sending:", err);
-//   } finally {
-//     whatsappWindowActive = false;
-//   }
-// }
+    await wbm.send([phone], message);
+    const wpResponse = await wbm.end();
+    sendResponse(
+      ws,
+      id,
+      "sent",
+      wpResponse === "browser-closed" ? "browser-closed" : "completed"
+    );
+    console.log(`Message processed successfully at: ${getFormattedDate()}`);
+  } catch (err) {
+    console.error("Error during WhatsApp message sending:", err);
+  } finally {
+    whatsappWindowActive = false;
+  }
+}
 
 function sendResponse(ws, id, cmd, status) {
   const response = JSON.stringify({ id, cmd, status });
