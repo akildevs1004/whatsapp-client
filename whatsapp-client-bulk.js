@@ -85,6 +85,7 @@ function connectWebSocket() {
       showBrowser: true,
       session: sessionActive,
       sessionName: "akil_session" + clientCompanyId.toString(),
+      companyId: clientCompanyId,
     });
   });
 
