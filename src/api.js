@@ -8,7 +8,7 @@ var rimraf = require("rimraf");
 let browser = null;
 let page = null;
 let counter = { fails: 0, success: 0 };
-const tmpPath = path.resolve(__dirname, "../tmp");
+let tmpPath = path.resolve(__dirname, "../tmp");
 
 const SELECTORS = {
   LOADING: "progress",
@@ -26,7 +26,9 @@ async function start({
   showBrowser = false,
   qrCodeData = false,
   session = true,
+  companyId = 1,
 } = {}) {
+  tmpPath = tmpPath + companyId;
   //console.log("start session", session);
   if (!session) {
     await deleteSession(tmpPath);
