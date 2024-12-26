@@ -8,7 +8,7 @@ const serverOptions = {
   key: fs.readFileSync("/etc/letsencrypt/live/mytime2cloud.com/privkey.pem"),
   cert: fs.readFileSync("/etc/letsencrypt/live/mytime2cloud.com/cert.pem"),
 };
-
+let isprocessing = false;
 // Create an HTTPS server
 const server = https.createServer(serverOptions);
 
@@ -16,7 +16,7 @@ const server = https.createServer(serverOptions);
 const wss = new WebSocket.Server({ server });
 
 // Object to store clients with unique IDs
-const clients = {};
+const clients = [];
 
 // Assign a unique ID to each client
 let clientId = 0;
@@ -45,8 +45,8 @@ wss.on("connection", async (ws) => {
 
   setInterval(async () => {
     console.log("Checking Pending in Queue");
-    await callClientService(ws);
-  }, 1000 * 60);
+    if (!isprocessing) await callClientService(ws);
+  }, 1000 * 30);
 
   // Listen for client messages
   ws.on("message", (message) => {
@@ -54,48 +54,56 @@ wss.on("connection", async (ws) => {
 
     console.log(`Received from  :`, message);
 
-    let id = message;
+    let id1 = message;
 
     if (!isNaN(message)) {
       clients["client_" + message] = ws;
       console.log("Number", message);
-    } else {
-    }
-    if (clients["client_" + message])
-      console.log(
-        `client readyState:`,
-        clients["client_" + message].readyState
-      );
 
-    console.log(`--------------New client connected: ${message}`);
-    console.log(`Received from ${id}:`, message);
-    // console.log("Received message From Client :", message.toString("utf-8"));
-
-    if (isValidJson(message)) {
-      try {
+      if (clients["client_" + message])
         console.log(
-          "---------------RESPONSE FROM Client-----------------------"
+          `client readyState:`,
+          clients["client_" + message].readyState
         );
-        let jsonData = JSON.parse(message);
 
-        const id = jsonData.id;
-        const cmd = jsonData.cmd;
-        console.log("--------------------------------------", cmd);
-        if (cmd === "sent") {
-          setTimeout(() => {
+      console.log(`--------------New client connected: ${message}`);
+      console.log(`Received from ${id1}:`, message);
+    } else {
+      // console.log("Received message From Client :", message.toString("utf-8"));
+
+      if (isValidJson(message)) {
+        try {
+          console.log(
+            `---------------Message  FROM Client-----------------------${message}`
+          );
+
+          let jsonData = JSON.parse(message);
+
+          const id = jsonData.id;
+          const cmd = jsonData.cmd;
+          const clientCompanyId = jsonData.clientCompanyId;
+
+          console.log(
+            "--------------------------------------",
+            clientCompanyId,
+            cmd
+          );
+          if (cmd === "sent") {
+            //setTimeout(() => {
             try {
               //update Table Log status id
               updateMessageStatusTable(id);
             } catch (error) {
               console.error("Error sending message on reconnect:", error);
             }
-          }, 5000);
+            //}, 1000);
+          }
+        } catch (e) {
+          console.error("Invalid JSON Format:", e);
         }
-      } catch (e) {
-        console.error("Invalid JSON Format:", e);
+      } else {
+        console.error("Invalid JSON Format:");
       }
-    } else {
-      console.error("Invalid JSON Format:");
     }
   });
 
@@ -137,43 +145,89 @@ async function updateMessageStatusTable(id) {
     console.error("Database Update Error", e);
   }
 }
+
+let messagearray = [];
 async function callClientService(ws) {
   try {
-    console.log(`Fetching Database Data`);
+    console.log(`isprocessing  ` + isprocessing);
+    isprocessing = true;
+    //ws.send("Hi - "+getFormattedDate());
+    //ws.send("Hi - ");
+    console.log(`Fetching Database Data - Clients : ` + clients.length);
+    //if (clients.length) {
+    //console.log(`Fetching Database Data - Clients : ` + clients.length);
 
     const query = `
     SELECT whatsapp_number, message, id, company_id 
     FROM whatsapp_notifications_logs 
     WHERE sent_status = false AND retry_count <= 10 AND company_id = $1 
     ORDER BY retry_count ASC, created_at DESC 
-    LIMIT 10
+    LIMIT 1
   `;
 
     for (const clientKey in clients) {
       if (clients.hasOwnProperty(clientKey)) {
         const clientId = clientKey.split("_")[1]; // Extract client ID from key (e.g., 'client_13' -> 13)
+        if (clientId) {
+          if (clients[clientKey]?.readyState === WebSocket.OPEN) {
+            //clients[clientKey].send("Hi - " + getFormattedDate());
 
-        if (clients[clientKey]?.readyState === WebSocket.OPEN) {
-          try {
-            const { rows: notifications } = await pool.query(query, [clientId]);
+            try {
+              const { rows: notifications } = await pool.query(query, [
+                clientId,
+              ]);
 
-            if (notifications.length > 0) {
-              clients[clientKey].send(JSON.stringify(notifications));
-              console.log(`Message sent to active client ${clientId}`);
-            } else {
-              console.log(`No messages to send for client ${clientId}`);
+              if (notifications.length > 0) {
+                if (
+                  messagearray.filter(
+                    (message) => message == notifications[0].id
+                  ).length == 0
+                ) {
+                  notifications.forEach((element) => {
+                    messagearray.push(element.id);
+                  });
+                } else {
+                  console.log(
+                    `${getFormattedDate()} : Duplicate Message  ${
+                      notifications[0].id
+                    }  
+                    }`
+                  );
+                }
+
+                clients[clientKey].send(JSON.stringify(notifications));
+                console.log(
+                  `${getFormattedDate()} : Message sent to active client ${clientId} ${
+                    notifications.length
+                  }`
+                );
+              } else {
+                console.log(
+                  `${getFormattedDate()} :No messages to send for client ${clientId}`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `${getFormattedDate()} :Failed to fetch or send messages to ${clientId}:`,
+                error
+              );
             }
-          } catch (error) {
-            console.error(
-              `Failed to fetch or send messages to ${clientId}:`,
-              error
+          } else {
+            console.log(
+              `${getFormattedDate()} :Client ${clientId} is not connected or ready.`
             );
           }
-        } else {
-          console.log(`Client ${clientId} is not connected or ready.`);
         }
       }
     }
+
+    isprocessing = false;
+
+    console.log(`isprocessing  ` + isprocessing);
+    // } else {
+    //   console.log("No Clignts are active - Cancelled ");
+    //   return false;
+    // }
 
     return false;
     const result = await pool.query(query);

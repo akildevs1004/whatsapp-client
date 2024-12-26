@@ -9,7 +9,7 @@ const logFileName = `log_${getFormattedDate("file")}.log`;
 const logStream = fs.createWriteStream(logFileName, { flags: "a" });
 let messageQueue = []; // Queue to store incoming messages
 let isProcessing = false; // Flag to indicate if a message is being processed
-let ws = new WebSocket("wss://139.59.69.241:7779", {
+const ws = new WebSocket("wss://139.59.69.241:7779", {
   rejectUnauthorized: false,
 });
 // Override console.log and console.error
@@ -34,49 +34,34 @@ let whatsappWindowActive = false;
 let disconnectCounter = 60;
 const clientCompanyId = 2; // Akil Security
 
-setInterval(() => {
-  console.log(
-    `-------------------------------------setInterval Pending count : ${messageQueue.length}-------------------------------`
-  );
-  if (ws) sendMessage(ws);
-}, 1000 * 15);
+// setInterval(() => {
+//   sendMessage();
+// }, 1000 * 60);
 
 // setTimeout(() => {
 //   sendMessage();
 // }, 1000 * 10);
 async function sendMessage(ws) {
-  console.log(
-    `************************Whatsapp Browser Initiaing  : ${isProcessing} ***************************`
-  );
   if (isProcessing) {
-    console.log("Whatsapp Message already processing... returning.");
+    console.log("Message processing... returning.");
     return;
   } // Exit if already processing
   isProcessing = true;
 
-  console.log(`Whatsapp messageQueue Pending count : ${messageQueue.length}`);
+  console.log(`messageQueue Pending count : ${messageQueue.length}`);
   const currentMessage = messageQueue.shift(); // Get the next message in the queue
-  console.log(`Whatsapp messageQueue Pending count : ${messageQueue.length}`);
+  console.log(`messageQueue Pending count : ${messageQueue.length}`);
   try {
-    console.log(`Whatsapp Processing message: ${currentMessage}`);
-    if (currentMessage) await processWhatsAppMessageBulk(ws, currentMessage);
+    console.log(`Processing message: ${currentMessage}`);
+    await processWhatsAppMessageBulk(ws, currentMessage);
+    console.log("Message processed successfully.");
 
-    console.log("Whatsapp Message processed successfully.");
-
-    //isProcessing = false; // Mark processing as done
-    // setTimeout(() => {
-    //   isProcessing = false;
-    // }, 1000 * 5);
+    // isProcessing = false; // Mark processing as done
   } catch (error) {
-    console.error("Whatsapp Error processing message:", error);
+    console.error("Error processing message:", error);
   }
-
-  isProcessing = false;
 }
 function connectWebSocket() {
-  ws = new WebSocket("wss://139.59.69.241:7779", {
-    rejectUnauthorized: false,
-  });
   ws.on("open", async () => {
     console.log(`Connected to WSS server with Company ID: ${clientCompanyId}`);
     ws.send(clientCompanyId.toString());
@@ -89,9 +74,7 @@ function connectWebSocket() {
   });
 
   ws.on("message", async (message) => {
-    console.log(
-      `SSSSSSSSSSSSSSSSSSSSSSSSSSSS Received from server: ${message} SSSSSSSSSSSSSSSSSSSSSSSSSSS`
-    );
+    ////////console.log(`Received from server: ${message}`);
 
     if (!sessionActive) {
       console.log("WhatsApp session inactive. Skipping message processing.");
@@ -120,21 +103,18 @@ function connectWebSocket() {
 
         if (JSON.parse(message).length > 0) {
           console.log(JSON.parse(message));
-          console.log("Duplicate ");
-          console.log(isDuplicate(JSON.parse(message)[0].id));
-          if (!isDuplicate(JSON.parse(message)[0].id)) {
-            messageQueue.push(JSON.parse(message));
+          console.log(JSON.parse(message)[0].id);
+          console.log(!isDuplicate(JSON.parse(message)[0].id));
 
-            console.log(
-              `Storing  new message at: ${JSON.parse(message)[0].id} ${
-                messageQueue.length
-              }`
-            );
-          }
+          // if (!isDuplicate(JSON.parse(message)[0].id))
+          messageQueue.push(JSON.parse(message));
+
+          console.log(`Storing  new message at: ${messageQueue.length}`);
+
           //////////console.log(messageQueue.length);
           //////await processWhatsAppMessageBulk(ws, JSON.parse(message));
           console.log(`Start isProcessing: ${isProcessing}`);
-          //if (isProcessing == false) await sendMessage(ws);
+          if (isProcessing == false) await sendMessage(ws);
 
           console.log(`End isProcessing: ${isProcessing}`);
         }
@@ -171,10 +151,10 @@ function connectWebSocket() {
     // process.exit(1); // Exit the application with an error code (1)
     //}
     console.log(
-      `--------------------------------------------------------------------------------------------------------------------------------------------------------Disconnected. Reconnecting in ${disconnectCounter} seconds...`
+      `Disconnected. Reconnecting in ${disconnectCounter} seconds...`
     );
     scheduleReconnect();
-    //wbm.end();
+    wbm.end();
   });
 
   ws.on("error", (err) => {
@@ -184,33 +164,6 @@ function connectWebSocket() {
   });
 }
 function isDuplicate(id) {
-  let found = false;
-
-  messageQueue.forEach((element) => {
-    element.forEach((message) => {
-      if (message.id == id) {
-        found = true;
-      }
-    });
-  });
-
-  return found;
-
-  console.log(id);
-  console.log("----------------");
-
-  messageQueue.forEach((element) => {
-    console.log(element[0]);
-  });
-  console.log("----------------");
-  let obj = messageQueue.filter((message) => message.id == id);
-  console.log(obj);
-  console.log(
-    `Duplicate Filter ${id} ${
-      messageQueue.filter((message) => message.id === id).length
-    } `
-  );
-
   return messageQueue.some((message) => message.id === id);
 }
 async function processWhatsAppMessageBulk(ws, messages) {
@@ -233,32 +186,28 @@ async function processWhatsAppMessageBulk(ws, messages) {
         console.log(contact.whatsapp_number);
 
         if (contact.whatsapp_number.length == 12) {
-          console.log(`process Start -----------${getFormattedDate()}`);
-          console.log(`process whatsapp_number: ${contact.whatsapp_number}`);
-          console.log(`process message:${contact.message}`);
+          console.log(`Start -----------${getFormattedDate()}`);
+          console.log(`whatsapp_number: ${contact.whatsapp_number}`);
+          console.log(`message:${contact.message}`);
 
-          console.log(
-            `process Start -------------------- ${getFormattedDate()}`
-          );
+          console.log(`Start -------------------- ${getFormattedDate()}`);
           //await setTimeout(1000 * 60); // 10 seconds
-
-          deleteMessageById(contact.id);
           await wbm.sendTo(contact.whatsapp_number, contact.message);
           deleteMessageById(contact.id);
           //await setTimeout(1000 * 60); // 10 seconds
           await sendResponse(ws, contact.id, "sent", "completed");
           deleteMessageById(contact.id);
-          console.log(`process Deleted ${contact.id}`);
-          console.log(`process End-------------------- ${getFormattedDate()}`);
+          console.log(`Deleted ${contact.id}`);
+          console.log(`End-------------------- ${getFormattedDate()}`);
 
           console.log(
-            `process Message processed successfully at: ${getFormattedDate()}`
+            `Message processed successfully at: ${getFormattedDate()}`
           );
 
           isProcessing = true; // Mark processing as done
         }
       } catch (err) {
-        console.error("process Error during WhatsApp message sending:", err);
+        console.error("Error during WhatsApp message sending:", err);
       }
     } //for
 
@@ -271,44 +220,14 @@ async function processWhatsAppMessageBulk(ws, messages) {
   whatsappWindowActive = false;
 }
 function deleteMessageById(id) {
-  // Find the outer array where the message exists
-  const element = messageQueue.find((array) =>
-    array.some((message) => message.id === id)
-  );
+  const messageIndex = messageQueue.findIndex((message) => message.id === id);
 
-  if (element) {
-    const index = element.findIndex((message) => message.id === id);
-    if (index !== -1) {
-      element.splice(index, 1); // Remove the message at found index
-      console.log(`Message with id: ${id} has been deleted from the queue.`);
-    } else {
-      console.log(`Message with id: ${id} not found in sub-array.`);
-    }
+  if (messageIndex !== -1) {
+    messageQueue.splice(messageIndex, 1); // Removes the element at the found index
+    console.log(`Message with id: ${id} has been deleted from the queue.`);
   } else {
-    console.log(`No sub-array found containing message with id: ${id}.`);
+    console.log(`Message with id: ${id} not found in the queue.`);
   }
-  // let found = false;
-
-  // messageQueue.forEach((element) => {
-  //   element.forEach((message, index) => {
-  //     if (message.id == id) {
-  //       found = true;
-
-  //       element.splice(index, 1); // Removes the element at the found index
-
-  //       console.log(`Message with id: ${id} has been deleted from the queue.`);
-  //     }
-  //   });
-  // });
-
-  // const messageIndex = messageQueue.findIndex((message) => message.id === id);
-
-  // if (messageIndex !== -1) {
-  //   messageQueue.splice(messageIndex, 1); // Removes the element at the found index
-  //   console.log(`Message with id: ${id} has been deleted from the queue.`);
-  // } else {
-  //   console.log(`Message with id: ${id} not found in the queue.`);
-  // }
 }
 async function processWhatsAppMessage(ws, phone, message, id) {
   whatsappWindowActive = true;
