@@ -36,6 +36,8 @@ pool.on("error", (err) => {
   console.error("Unexpected error on idle client", err);
   process.exit(-1);
 });
+let isProcessing = false;
+let isProcessingDate = getFormattedDate();
 
 // Handle WebSocket connections
 wss.on("connection", async (ws) => {
@@ -43,11 +45,18 @@ wss.on("connection", async (ws) => {
 
   callClientService(ws);
 
-  let isProcessing = false;
-
   setInterval(async () => {
-    if (isProcessing) {
+    console.log(
+      "Time Difference ",
+      (new Date(getFormattedDate()) - new Date(isProcessingDate)) / 1000
+    );
+
+    if (
+      isProcessing ||
+      (new Date(getFormattedDate()) - new Date(isProcessingDate)) / 1000 < 10
+    ) {
       console.log(
+        getFormattedDate(),
         "isProcessing - Previous process still running, skipping this interval.",
         isProcessing
       );
@@ -63,13 +72,16 @@ wss.on("connection", async (ws) => {
 
     try {
       await callClientService(ws);
+      //isProcessing = false;
     } catch (error) {
       console.error("Error while calling client service:", error);
     } finally {
-      isProcessing = false;
+      // isProcessing = false;
       console.log("isProcessing - Finally Checking  ", isProcessing);
     }
-  }, 1000 * 30);
+
+    isProcessingDate = getFormattedDate();
+  }, 1000 * 15);
 
   // Listen for client messages
   ws.on("message", (message) => {
@@ -172,7 +184,9 @@ async function updateMessageStatusTable(id) {
 let messagearray = [];
 async function callClientService(ws) {
   try {
-    console.log(`isprocessing  ` + isprocessing);
+    console.log(`isprocessing callClientService  ` + isprocessing);
+
+    if (isprocessing) return false;
 
     //ws.send("Hi - "+getFormattedDate());
     //ws.send("Hi - ");
@@ -180,13 +194,27 @@ async function callClientService(ws) {
     //if (clients.length) {
     //console.log(`Fetching Database Data - Clients : ` + clients.length);
 
-    const query = `
+    let query = `
+    SELECT whatsapp_number, message, id, company_id 
+    FROM whatsapp_notifications_logs 
+    WHERE sent_status = false AND retry_count <= 10 AND company_id = $1  
+
+     
+    ORDER BY retry_count ASC, created_at DESC 
+    LIMIT 20
+  `;
+    if (messagearray.length > 0)
+      query = `
     SELECT whatsapp_number, message, id, company_id 
     FROM whatsapp_notifications_logs 
     WHERE sent_status = false AND retry_count <= 10 AND company_id = $1 
+
+    AND id NOT IN (${messagearray.join(",")})
     ORDER BY retry_count ASC, created_at DESC 
-    LIMIT 1
+    LIMIT 20
   `;
+
+    //console.log(query);
 
     for (const clientKey in clients) {
       if (clients.hasOwnProperty(clientKey)) {
@@ -194,31 +222,43 @@ async function callClientService(ws) {
         if (clientId) {
           if (clients[clientKey]?.readyState === WebSocket.OPEN) {
             //clients[clientKey].send("Hi - " + getFormattedDate());
+            const params = [clientId];
 
             try {
-              const { rows: notifications } = await pool.query(query, [
-                clientId,
-              ]);
+              const { rows: notifications } = await pool.query(query, params);
 
               if (notifications.length > 0) {
-                if (
-                  messagearray.filter(
-                    (message) => message == notifications[0].id
-                  ).length == 0
-                ) {
-                  notifications.forEach((element) => {
-                    messagearray.push(element.id);
-                  });
-                } else {
-                  console.log(
-                    `${getFormattedDate()} : Duplicate Message  ${
-                      notifications[0].id
-                    }  
-                    }`
-                  );
-                }
+                // if (
+                //   messagearray.filter(
+                //     (message) => message == notifications[0].id
+                //   ).length == 0
+                // ) {
+                notifications.forEach((element) => {
+                  messagearray.push(element.id);
+                });
+                // } else {
+                //   console.log(
+                //     `${getFormattedDate()} : Duplicate Message  ${
+                //       notifications[0].id
+                //     }
+                //     }`
+                //   );
+                // }
+                //messagearray.push(notification.id);
+                // notifications.forEach((notification) => {
+                //   if (!messagearray.includes(notification.id)) {
+                //     messagearray.push(notification.id);
+                //   } else {
+                //     console.log(
+                //       `${getFormattedDate()} : Duplicate Message Found ${
+                //         notification.id
+                //       }`
+                //     );
+                //   }
+                // });
 
-                clients[clientKey].send(JSON.stringify(notifications));
+                await clients[clientKey].send(JSON.stringify(notifications));
+
                 console.log(
                   `${getFormattedDate()} : Message sent to active client ${clientId} ${
                     notifications.length
@@ -242,7 +282,8 @@ async function callClientService(ws) {
           }
         }
       }
-    }
+      isProcessing = false;
+    } //for
 
     console.log(`isprocessing  ` + isprocessing);
     // } else {
