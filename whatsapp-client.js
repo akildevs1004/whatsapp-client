@@ -318,6 +318,7 @@ setInterval(() => {
     console.log("Socket Connection lost. Reconnecting...");
     connectWebSocket();
   } else {
+    ws.send(clientCompanyId.toString());
     console.log("Socket Connection is active.");
   }
 }, 1000 * 60); // 1 minute
