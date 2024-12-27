@@ -3,15 +3,23 @@ const wbm = require("./src/index");
 const rimraf = require("rimraf");
 const path = require("path");
 const fs = require("fs");
-const { setTimeout } = require("timers/promises");
-// Create a writable stream for logging
-const logFileName = `log_${getFormattedDate("file")}.log`;
+require("dotenv").config();
+
+const SOCKET_ENDPOINT = process.env.SOCKET_ENDPOINT;
+const clientCompanyId = process.env.COMPANY_ID;
+const clientCompanyName = process.env.COMPANY_NAME;
+
+console.log("SOCKET_ENDPOINT :", SOCKET_ENDPOINT);
+console.log("Company Id :", clientCompanyId);
+console.log("Company Name :", clientCompanyName);
+console.log("Company Name :", process.env.VERSION);
+
+const logFileName = `logs/log_${getFormattedDate("file")}.log`;
 const logStream = fs.createWriteStream(logFileName, { flags: "a" });
 let messageQueue = []; // Queue to store incoming messages
 let isProcessing = false; // Flag to indicate if a message is being processed
-let ws = new WebSocket("wss://139.59.69.241:7779", {
-  rejectUnauthorized: false,
-});
+
+let socketConnectionStatus = false;
 // Override console.log and console.error
 // Override console.log and console.error to log both to file and console
 function logToFileAndConsole(message, type = "log") {
@@ -32,18 +40,24 @@ console.error = (message) => logToFileAndConsole(message, "stderr");
 let sessionActive = true;
 let whatsappWindowActive = false;
 let disconnectCounter = 60;
-const clientCompanyId = 2; // Akil Security
+
+wbm.start({
+  showBrowser: true,
+  session: sessionActive,
+  sessionName: "akil_session" + clientCompanyId.toString(),
+  companyId: clientCompanyId,
+});
 
 setInterval(() => {
   console.log(
     `-------------------------------------setInterval Pending count : ${messageQueue.length}-------------------------------`
   );
+
+  //console.log(ws);
+
   if (ws) sendMessage(ws);
 }, 1000 * 15);
 
-// setTimeout(() => {
-//   sendMessage();
-// }, 1000 * 10);
 async function sendMessage(ws) {
   console.log(
     `************************Whatsapp Browser Initiaing  : ${isProcessing} ***************************`
@@ -54,42 +68,45 @@ async function sendMessage(ws) {
   } // Exit if already processing
   isProcessing = true;
 
-  console.log(`Whatsapp messageQueue Pending count : ${messageQueue.length}`);
+  console.log(
+    `Whatsapp messageQueue Pending count Before : ${messageQueue.length}`
+  );
   const currentMessage = messageQueue.shift(); // Get the next message in the queue
-  console.log(`Whatsapp messageQueue Pending count : ${messageQueue.length}`);
-  try {
-    console.log(`Whatsapp Processing message: ${currentMessage}`);
-    if (currentMessage) await processWhatsAppMessageBulk(ws, currentMessage);
+  console.log(
+    `Whatsapp messageQueue Pending count  After : ${messageQueue.length}`
+  );
+  if (currentMessage) {
+    try {
+      console.log(`Whatsapp Processing message: ${currentMessage}`);
+      if (currentMessage) await processWhatsAppMessageBulk(ws, currentMessage);
 
-    console.log("Whatsapp Message processed successfully.");
-
-    //isProcessing = false; // Mark processing as done
-    // setTimeout(() => {
-    //   isProcessing = false;
-    // }, 1000 * 5);
-  } catch (error) {
-    console.error("Whatsapp Error processing message:", error);
+      console.log("Whatsapp Message processed successfully.");
+    } catch (error) {
+      console.error("Whatsapp Error processing message:", error);
+    }
   }
-
   isProcessing = false;
 }
+
 function connectWebSocket() {
-  ws = new WebSocket("wss://139.59.69.241:7779", {
+  console.log(
+    `---------------------Initialed Connected to WSS server with Company ID: ${clientCompanyId}`
+  );
+  ws = new WebSocket(SOCKET_ENDPOINT, {
     rejectUnauthorized: false,
   });
   ws.on("open", async () => {
+    socketConnectionStatus = true;
     console.log(`Connected to WSS server with Company ID: ${clientCompanyId}`);
-    ws.send(clientCompanyId.toString());
 
-    await wbm.start({
-      showBrowser: true,
-      session: sessionActive,
-      sessionName: "akil_session" + clientCompanyId.toString(),
-      companyId: clientCompanyId,
-    });
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(clientCompanyId.toString());
+      console.log("Message sent:", clientCompanyId);
+    }
   });
 
   ws.on("message", async (message) => {
+    socketConnectionStatus = true;
     console.log(
       `SSSSSSSSSSSSSSSSSSSSSSSSSSSS Received from server: ${message} SSSSSSSSSSSSSSSSSSSSSSSSSSS`
     );
@@ -110,15 +127,6 @@ function connectWebSocket() {
 
       //  if (!whatsappWindowActive) {
       if (parseInt(company_id) != clientCompanyId) {
-        ///////////console.log(`Storing  new message at: ${getFormattedDate()}`);
-        // await processWhatsAppMessage(
-        //   ws,
-        //   whatsapp_number,
-        //   whatsappMessage,
-        //   id
-        // );
-        // console.log(`Message in Queue : ${JSON.parse(message)}`);
-
         if (JSON.parse(message).length > 0) {
           console.log(JSON.parse(message));
           console.log("Duplicate ");
@@ -135,7 +143,6 @@ function connectWebSocket() {
           //////////console.log(messageQueue.length);
           //////await processWhatsAppMessageBulk(ws, JSON.parse(message));
           console.log(`Start isProcessing: ${isProcessing}`);
-          //if (isProcessing == false) await sendMessage(ws);
 
           console.log(`End isProcessing: ${isProcessing}`);
         }
@@ -144,11 +151,6 @@ function connectWebSocket() {
           `Company ID mismatch. Expected: ${clientCompanyId}, Received: ${company_id}`
         );
       }
-      // } else {
-      //   console.log(
-      //     `Message already in queue: cmd=${cmd}, whatsappWindowActive=${whatsappWindowActive}`
-      //   );
-      // }
     } catch (error) {
       console.error("Error parsing JSON or processing message:", error);
     }
@@ -162,26 +164,23 @@ function connectWebSocket() {
 
     console.log(`Heap Used: ${heapUsedInMB.toFixed(2)} MB`);
 
-    // Check if memory usage exceeds 1 MB
-    //if (heapUsedInMB > 10) {
-    //console.log("Memory usage exceeded 10 MB. Closing application...");
-
-    //global.gc();
-
     console.log(`Heap Used: ${heapUsedInMB.toFixed(2)} MB`);
     // process.exit(1); // Exit the application with an error code (1)
     //}
     console.log(
-      `--------------------------------------------------------------------------------------------------------------------------------------------------------Disconnected. Reconnecting in ${disconnectCounter} seconds...`
+      `----------------------------------------------------------------------------------------------------Disconnected. Reconnecting in ${disconnectCounter} seconds...`
     );
-    scheduleReconnect();
     //wbm.end();
+    socketConnectionStatus = false;
+    scheduleReconnect();
   });
 
   ws.on("error", (err) => {
+    socketConnectionStatus = false;
+
     console.error("WebSocket error:", err);
+    //wbm.end();
     scheduleReconnect();
-    wbm.end();
   });
 }
 function isDuplicate(id) {
@@ -196,23 +195,6 @@ function isDuplicate(id) {
   });
 
   return found;
-
-  console.log(id);
-  console.log("----------------");
-
-  messageQueue.forEach((element) => {
-    console.log(element[0]);
-  });
-  console.log("----------------");
-  let obj = messageQueue.filter((message) => message.id == id);
-  console.log(obj);
-  console.log(
-    `Duplicate Filter ${id} ${
-      messageQueue.filter((message) => message.id === id).length
-    } `
-  );
-
-  return messageQueue.some((message) => message.id === id);
 }
 async function processWhatsAppMessageBulk(ws, messages) {
   console.log(
@@ -221,12 +203,6 @@ async function processWhatsAppMessageBulk(ws, messages) {
 
   whatsappWindowActive = true;
   console.log(messages);
-
-  // await wbm.start({
-  //   showBrowser: true,
-  //   session: sessionActive,
-  //   sessionName: "akil_session",
-  // });
 
   (async () => {
     for (contact of messages) {
@@ -288,52 +264,6 @@ function deleteMessageById(id) {
   } else {
     console.log(`No sub-array found containing message with id: ${id}.`);
   }
-  // let found = false;
-
-  // messageQueue.forEach((element) => {
-  //   element.forEach((message, index) => {
-  //     if (message.id == id) {
-  //       found = true;
-
-  //       element.splice(index, 1); // Removes the element at the found index
-
-  //       console.log(`Message with id: ${id} has been deleted from the queue.`);
-  //     }
-  //   });
-  // });
-
-  // const messageIndex = messageQueue.findIndex((message) => message.id === id);
-
-  // if (messageIndex !== -1) {
-  //   messageQueue.splice(messageIndex, 1); // Removes the element at the found index
-  //   console.log(`Message with id: ${id} has been deleted from the queue.`);
-  // } else {
-  //   console.log(`Message with id: ${id} not found in the queue.`);
-  // }
-}
-async function processWhatsAppMessage(ws, phone, message, id) {
-  whatsappWindowActive = true;
-  try {
-    await wbm.start({
-      showBrowser: true,
-      session: sessionActive,
-      sessionName: "akil_session",
-    });
-
-    await wbm.send([phone], message);
-    const wpResponse = await wbm.end();
-    sendResponse(
-      ws,
-      id,
-      "sent",
-      wpResponse === "browser-closed" ? "browser-closed" : "completed"
-    );
-    console.log(`Message processed successfully at: ${getFormattedDate()}`);
-  } catch (err) {
-    console.error("Error during WhatsApp message sending:", err);
-  } finally {
-    whatsappWindowActive = false;
-  }
 }
 
 async function sendResponse(ws, id, cmd, status) {
@@ -343,8 +273,12 @@ async function sendResponse(ws, id, cmd, status) {
 }
 
 function scheduleReconnect() {
-  setTimeout(connectWebSocket, 1000 * disconnectCounter);
-  //disconnectCounter = Math.min(disconnectCounter + 10, 60);
+  console.log(
+    "---------------------------Trying to reconnecting  socket and whatsapp SETTIMEOUT"
+  );
+  setTimeout(() => {
+    connectWebSocket();
+  }, 1000 * 30);
 }
 
 function getFormattedDate(format = "console") {
@@ -379,6 +313,13 @@ function deleteFileWithRetry(filePath, retries = 3) {
   }
   tryDelete();
 }
-
+setInterval(() => {
+  if (!socketConnectionStatus) {
+    console.log("Socket Connection lost. Reconnecting...");
+    connectWebSocket();
+  } else {
+    console.log("Socket Connection is active.");
+  }
+}, 1000 * 60); // 1 minute
 // Start WebSocket connection
 connectWebSocket();

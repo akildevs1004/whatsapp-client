@@ -1,7 +1,7 @@
 @echo off
 :loop
     REM Run whatsapp-client-bulk.js in the background using node (only once at the beginning)
-    start /b node whatsapp-client-bulk.js
+    start /b node whatsapp-client.js
 
     REM Wait for the application to start
     timeout /t 5 /nobreak >nul

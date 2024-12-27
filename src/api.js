@@ -28,7 +28,7 @@ async function start({
   session = true,
   companyId = 1,
 } = {}) {
-  tmpPath = tmpPath + companyId;
+  tmpPath = path.resolve(__dirname, "../tmp") + companyId;
   //console.log("start session", session);
   if (!session) {
     await deleteSession(tmpPath);
