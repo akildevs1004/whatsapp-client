@@ -69,14 +69,15 @@ wss.on("connection", async (ws) => {
 
     try {
       await callClientService(ws);
-      //isProcessing = false;
+      isProcessing = false;
+      isProcessingDate = getFormattedDate();
     } catch (error) {
       console.error("Error while calling client service:", error);
     } finally {
       // isProcessing = false;
       console.log("isProcessing - Finally Checking  ", isProcessing);
     }
-
+    isProcessing = false;
     isProcessingDate = getFormattedDate();
   }, 1000 * 15);
 
