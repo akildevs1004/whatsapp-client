@@ -314,13 +314,16 @@ function deleteFileWithRetry(filePath, retries = 3) {
   tryDelete();
 }
 setInterval(() => {
-  if (!socketConnectionStatus) {
-    console.log("Socket Connection lost. Reconnecting...");
-    connectWebSocket();
-  } else {
+  try {
+    if (!socketConnectionStatus) {
+      console.log("Socket Connection lost. Reconnecting...");
+      connectWebSocket();
+    } else {
+      console.log("Socket Connection is active.");
+    }
+
     ws.send(clientCompanyId.toString());
-    console.log("Socket Connection is active.");
-  }
+  } catch (error) {}
 }, 1000 * 60); // 1 minute
 // Start WebSocket connection
 connectWebSocket();
