@@ -91,12 +91,20 @@ function connectWebSocket() {
   ws.on("open", async () => {
     socketConnectionStatus = true;
     console.log(`Connected to WSS server with Company ID: ${clientCompanyId}`);
-    wbm.start({
-      showBrowser: true,
-      session: sessionActive,
-      sessionName: "akil_session" + clientCompanyId.toString(),
-      companyId: clientCompanyId,
-    });
+    try {
+      if (wbm) wbm.end();
+    } catch (e) {}
+    try {
+      console.log(`Connected to WSS server - Whatsapp Browser is ON status`);
+      wbm.start({
+        showBrowser: true,
+        session: sessionActive,
+        sessionName: "akil_session" + clientCompanyId.toString(),
+        companyId: clientCompanyId,
+      });
+    } catch (e) {
+      console.log(e);
+    }
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(clientCompanyId.toString());
       console.log("Message sent:", clientCompanyId);

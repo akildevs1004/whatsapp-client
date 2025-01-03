@@ -167,7 +167,7 @@ async function waitQRCode() {
  * @param {string} msg
  */
 async function QRCodeExeption(msg) {
-  await browser.close();
+  if (browser) await browser.close();
   return "QRCodeException: " + msg;
 }
 
@@ -245,7 +245,7 @@ function generateCustomMessage(contact, messagePrototype) {
  * Close browser and show results(number of messages sent and failed)
  */
 async function end() {
-  await browser.close();
+  if (browser) await browser.close();
   //console.log(`Result: ${counter.success} sent, ${counter.fails} failed`);
 
   return "browser-closed";
