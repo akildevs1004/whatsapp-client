@@ -315,6 +315,8 @@ function deleteFileWithRetry(filePath, retries = 3) {
     });
   }
   tryDelete();
+
+  //1
 }
 setInterval(() => {
   try {
