@@ -39,14 +39,7 @@ console.error = (message) => logToFileAndConsole(message, "stderr");
 
 let sessionActive = true;
 let whatsappWindowActive = false;
-let disconnectCounter = 60;
-
-wbm.start({
-  showBrowser: true,
-  session: sessionActive,
-  sessionName: "akil_session" + clientCompanyId.toString(),
-  companyId: clientCompanyId,
-});
+let disconnectCounter = 30;
 
 setInterval(() => {
   console.log(
@@ -98,7 +91,12 @@ function connectWebSocket() {
   ws.on("open", async () => {
     socketConnectionStatus = true;
     console.log(`Connected to WSS server with Company ID: ${clientCompanyId}`);
-
+    wbm.start({
+      showBrowser: true,
+      session: sessionActive,
+      sessionName: "akil_session" + clientCompanyId.toString(),
+      companyId: clientCompanyId,
+    });
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(clientCompanyId.toString());
       console.log("Message sent:", clientCompanyId);
@@ -158,21 +156,26 @@ function connectWebSocket() {
 
   ws.on("close", () => {
     const memoryUsage = process.memoryUsage();
-
+    console.log(
+      `*************WEBSOCKET IS CLOSED*****************************`
+    );
     // Convert heapUsed from bytes to MB (1 MB = 1024 * 1024 bytes)
     const heapUsedInMB = memoryUsage.heapUsed / (1024 * 1024);
 
     console.log(`Heap Used: ${heapUsedInMB.toFixed(2)} MB`);
 
-    console.log(`Heap Used: ${heapUsedInMB.toFixed(2)} MB`);
     // process.exit(1); // Exit the application with an error code (1)
     //}
     console.log(
-      `----------------------------------------------------------------------------------------------------Disconnected. Reconnecting in ${disconnectCounter} seconds...`
+      `------------ - ----------Disconnected. Reconnecting in ${disconnectCounter} seconds...`
     );
     //wbm.end();
     socketConnectionStatus = false;
     scheduleReconnect();
+
+    // ws = new WebSocket(SOCKET_ENDPOINT, {
+    //   rejectUnauthorized: false,
+    // });
   });
 
   ws.on("error", (err) => {
@@ -274,7 +277,7 @@ async function sendResponse(ws, id, cmd, status) {
 
 function scheduleReconnect() {
   console.log(
-    "---------------------------Trying to reconnecting  socket and whatsapp SETTIMEOUT"
+    "---------------------------Trying to reconnecting  socket and whatsapp SETTIMEOUT - NO INTERNET "
   );
   setTimeout(() => {
     connectWebSocket();
@@ -326,4 +329,14 @@ setInterval(() => {
   } catch (error) {}
 }, 1000 * 60); // 1 minute
 // Start WebSocket connection
-connectWebSocket();
+
+try {
+  connectWebSocket();
+} catch (error) {}
+
+// Monitor memory usage every second
+setInterval(() => {
+  const memoryUsage = process.memoryUsage();
+  const heapUsedMB = (memoryUsage.heapUsed / (1024 * 1024)).toFixed(0); // Convert to MB
+  fs.writeFileSync("memory.log", heapUsedMB); // Write memory usage to memory.log
+}, 1000 * 10);
